@@ -45,7 +45,7 @@ baseurl=file://$LOCATION/hc/rpm
 gpgcheck=0
 eof
     nohup yum install mysql-community-server -y > /var/log/install.log 2>&1 & 
-    echo "`grep -w mysql $PASS | awk -F"," '{print $1}'`" | passwd --stdin mysql && \
+    
     process_id=$!
 
     spin='-\|/'
@@ -57,6 +57,7 @@ eof
             sleep .1
     done
     echo 
+    echo "`grep -w mysql $PASS | awk -F"," '{print $1}'`" | passwd --stdin mysql && \
     rpm -qa | grep 'mysql-community-server' && ok_p || error_p
     mkdir -p $LOG $DATA
     chown -R mysql. $LOG  $DATA
