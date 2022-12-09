@@ -81,12 +81,11 @@ eof
 }
 
 redis_create(){
-    
     if [ ! -d $SOFTWARE/bin ] ;then
     title "Build redis"
         ping -c1 www.baidu.com &>/dev/null
         if [ $? -eq 0 ];then
-            repo
+            #repo
             nohup yum install  make systemd-devel gcc -y &> $INSTALL_LOG &
             process $!
             wait $1
@@ -111,10 +110,10 @@ redis_create(){
         title  "Create a redis user"
         useradd redis 
         echo "$REDIS_USER_PASS" | passwd --stdin redis 
-        mkdir $DATA -p
-        chown  -R redis. $DATA $SOFTWARE && ok_p || error_p
     fi
 
+    mkdir $DATA -p
+    chown  -R redis. $DATA $SOFTWARE && ok_p || error_p
 }
 
 
@@ -383,8 +382,9 @@ case $1 in
                     menu
                 fi
             done
+            
             mkdir -p $SOFTWARE/cluster.d
-            chown -R redis. $SOFTWARE
+            #chown -R redis. $SOFTWARE
             for s in "$@";do
                 PORT=$s
 
