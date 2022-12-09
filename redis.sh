@@ -10,7 +10,7 @@ is_package(){
         echo "The $REDIS_VERSION version will be installed by default"
         
     else
-        name=$(tar tvf $package| head -n1 | awk '{print $NF}')
+        name=$(tar tvf $package| head -n1 | awk '{print $NF}'|sed 's#/##g')
         REDIS_VERSION=$name
         echo "Start to install the $REDIS_VERSION version"
         tar xf $package
