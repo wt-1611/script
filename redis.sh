@@ -1,5 +1,25 @@
 #!/bin/bash
-SOURCE=/root/redis-6.2.7
+
+
+REDIS_VERSION=redis-6.2.7
+
+
+is_package(){
+    package=$(ls -1 $CURRENT  | egrep 'redis-(.*)\.tar\.gz' | sed -n 1p)
+    if [ "$package" = "" ] ;then
+        echo "The $REDIS_VERSION version will be installed by default"
+        
+    else
+        name=$(tar tvf $package| head -n1 | awk '{print $NF}')
+        REDIS_VERSION=$name
+        echo "Start to install the $REDIS_VERSION version"
+        tar xf $package
+    fi
+}
+
+is_package
+
+SOURCE=/root/$REDIS_VERSION
 SOFTWARE=/opt/redis6
 PORT=6379
 DATA_BASE=/data/redis6
@@ -8,6 +28,8 @@ CONF=$SOFTWARE/redis${PORT}.conf
 CURRENT=`pwd`
 
 REDIS_USER_PASS=$(openssl rand -hex 16)
+
+INSTALL_LOG=/var/log/install.log
 
 
 ok_p(){
@@ -31,58 +53,86 @@ foo(){
     echo -en "\033[1;34m $1 \033[0m\n"
 }
 
+
+process(){
+    spin='-\|/'
+    i=0
+    while [ `ps axo pid | grep $1 |wc -l` -ne 0 ]
+    do
+            i=$(( (i+1) %4 ))
+            printf "\r[${spin:$i:1}]"
+            sleep .1
+    done
+}
+
 repo(){
     
-    [ ! -f /etc/yum.repos.d/redis.repo  ] && \
-    title "Creating a Local Source"
-cat >/etc/yum.repos.d/redis.repo<<eof
+    if  [ ! -f /etc/yum.repos.d/redis.repo  ];then
+        title "Creating a Local Source"
+        cat >/etc/yum.repos.d/redis.repo<<eof
 [redis]
 name=hc
 baseurl=file://$CURRENT/hc/rpm
 enable=1
 gpgcheck=0
 eof
-ok_p
+        ok_p
+    fi
 }
 
 redis_create(){
-    title "Create the redis environment"
+    
     if [ ! -d $SOFTWARE/bin ] ;then
+    title "Build redis"
         ping -c1 www.baidu.com &>/dev/null
         if [ $? -eq 0 ];then
             repo
-            yum install  make systemd-devel gcc -y
+            nohup yum install  make systemd-devel gcc -y &> $INSTALL_LOG &
+            process $!
+            wait $1
+            [ $? -eq 0 ] && ok_p || error_p
         else
             mkdir /etc/yum.repos.d/bak -p
             mv /etc/yum.repos.d/*.repo  /etc/yum.repos.d/bak
             repo
+            nohup yum install  make systemd-devel gcc -y &> $INSTALL_LOG &
+            process $!
+            wait $1
+            [ $? -eq 0 ] && ok_p || error_p
         fi
-        yum install  make systemd-devel gcc -y
         cd $SOURCE
-        make PREFIX=$SOFTWARE install && ok_p || error_p
+        nohup make PREFIX=$SOFTWARE install &>>$INSTALL_LOG &
+        process $!
+        wait $!
+        [ $? -eq 0 ] && ok_p || error_p
     fi
-    title  "Create a redis user"
-    useradd redis &>/dev/null
-    echo "$REDIS_USER_PASS" | passwd --stdin redis &>/dev/null
-    mkdir $DATA -p
-    chown  -R redis. $DATA $SOFTWARE && ok_p || error_p
+    id redis &>/dev/null
+    if [ $? -ne 0 ];then
+        title  "Create a redis user"
+        useradd redis 
+        echo "$REDIS_USER_PASS" | passwd --stdin redis 
+        mkdir $DATA -p
+        chown  -R redis. $DATA $SOFTWARE && ok_p || error_p
+    fi
 
 }
 
 
 kernel(){
-    title "redis kernel parameter"
+    
 if [ ! -f /etc/sysctl.d/redis.conf ];then
+title "redis kernel parameter"
 cat >> /etc/sysctl.d/redis.conf <<eof
 vm.overcommit_memory=1
 net.core.somaxconn=1024
 eof
-fi
 sysctl -p && ok_p || error_p
+fi
+
 }
 
 conf(){
-    title "redis of configurage"
+    title "Example Create the redis$1 configuration file"
 cat > $CONF <<eof
 bind 0.0.0.0
 protected-mode yes 
@@ -168,7 +218,7 @@ eof
 }
 
 redis_start(){
-    title "redis startup file && Starting redis"
+    title "Create the redis$1 startup file && Starting redis$1"
 cat > /usr/lib/systemd/system/redis_${PORT}.service <<eof
 [Unit]
 Description=Redis persistent key-value database
@@ -209,15 +259,14 @@ exit 2
 
 
 redis(){
-    repo 
     redis_create
     kernel
-    conf
-    redis_start
+    conf    $PORT
+    redis_start  $PORT
 }
 
 modify(){
-    title "Configuration File Modification"
+    title "Enable the redis$PORT cluster mode"
     sed -i "s/^port.*/port $PORT/" $CONF
     sed -i "s/^appendonly.*/appendonly yes/" $CONF
     sed -i "s/^requirepass.*/requirepass $1/" $CONF
@@ -231,12 +280,12 @@ EOF
 
 
 redis_cluster(){
-    repo
+
     redis_create
     kernel
-    conf
+    conf    $PORT
     modify $1
-    redis_start
+    redis_start  $PORT
 }
 
 
@@ -246,8 +295,18 @@ is_port(){
      echo 'port '''$1''' already exists' 
      exit 1
     fi
-
 }
+
+is_dir(){
+    if [ -d $1 -o -f $2 ];then
+        echo 'The configuration file or data directory of redis'''$PORT''' already exists!!!'
+        exit 1
+    fi
+}
+
+
+
+
 
 case $1 in 
     single)
@@ -289,9 +348,11 @@ case $1 in
 
             for s in "$@";do
                 PORT=$s
+                
  
                 DATA=$DATA_BASE/$PORT
                 CONF=$SOFTWARE/redis${PORT}.conf
+                is_dir $DATA $CONF
                 redis
             done
     ;;
@@ -329,6 +390,7 @@ case $1 in
 
                 DATA=$DATA_BASE/$PORT
                 CONF=$SOFTWARE/redis${PORT}.conf
+                is_dir $DATA $CONF
                 redis_cluster $pass
             done
 
@@ -339,7 +401,8 @@ case $1 in
     ;;
 
     *)
-    menu
+        menu
+
     ;;
 
 esac
@@ -347,9 +410,10 @@ esac
 
 
 title "Environment"
-foo "port    :   $num"
-foo "software:   $SOFTWARE"
-foo "conf    :   $SOFTWARE"
-foo "data    :   $DATA_BASE"
-foo "service :   systemctl [start|stop] redis_<port>"
+foo "port       :   $num"
+foo "software   :   $SOFTWARE"
+foo "conf       :   $SOFTWARE"
+foo "data       :   $DATA_BASE"
+foo "user pass  :   $REDIS_USER_PASS"
+foo "service    :   systemctl [start|stop] redis_<port>"
 
