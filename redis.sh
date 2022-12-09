@@ -82,7 +82,7 @@ eof
 
 redis_create(){
     if [ ! -d $SOFTWARE/bin ] ;then
-    title "Build redis"
+    title "Build redis 1"
         ping -c1 www.baidu.com &>/dev/null
         if [ $? -eq 0 ];then
             #repo
@@ -99,6 +99,7 @@ redis_create(){
             wait $1
             [ $? -eq 0 ] && ok_p || error_p
         fi
+    title "Build redis 2"
         cd $SOURCE
         nohup make PREFIX=$SOFTWARE install &>>$INSTALL_LOG &
         process $!
