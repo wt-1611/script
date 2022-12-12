@@ -7,10 +7,6 @@
 
 
 
-
-
-
-
 JDK_11_VERSION=jdk-11.0.16.1_linux-x64_bin.tar.gz
 JAVA_11_HOME=/opt/jdk-11.0.16.1
 PINPOINT_VERSION=2.4.2
@@ -29,7 +25,7 @@ PINPOINT_USER=pinpoint
 PASS=/root/.Ppass
 CREATE_USER_PASS="$HBASE_USER $PINPOINT_USER"
 
-SOFTWARE_BASE=`pwd`
+SOFTWARE_BASE=`pwd`/pinpoint
 
 MYSQL_PORT=3306
 
@@ -41,6 +37,7 @@ BASE=/opt/pinpoint
 COLLECTOR=$BASE/collector
 WEB=$BASE/web
 BATCH=$BASE/batch
+
 
 
 ok_p(){
@@ -97,7 +94,7 @@ pass(){
     rm -f $PASS
     for i in $CREATE_USER_PASS;do
         pas=$(openssl rand -base64 16)
-        echo "$i,$pas" >>$PASS
+        echo "$i,${pas}1" >>$PASS
     done
     chmod 000 $PASS
 }
@@ -180,7 +177,7 @@ hbase_start(){
       systemctl daemon-reload && systemctl enable --now hbase.service && ok_p || error_p
       title "create pinpoint database" 
       #netstat  -tpln | awk -F '/' '{print $NF}' | grep mysqld &>/dev/null && \
-      bash $SOFTWARE_BASE/script.sh $TTL  && \
+      bash $SOFTWARE_BASE/script.sh $TTL $SOFTWARE_BASE/hbase-create.hbase  && \
       nohup $HBASE_SOFTWARE/bin/hbase shell $SOFTWARE_BASE/hbase-create.hbase &>>$INSTALL_LOG & 
       process $!
       echo
@@ -213,8 +210,9 @@ pinpoint_env(){
     \cp -f $SOFTWARE_BASE/batch-root.properties  $BATCH
     \cp -f $SOFTWARE_BASE/jdbc-root.properties $BATCH
     \cp -f $SOFTWARE_BASE/jdbc-root.properties $WEB
-    echo 'webhook.enable=true' >> $WEB/jdbc-root.properties
-    chown -R $PINPOINT_USER. $BASE  && ok_p || error_p
+    \cp -f $SOFTWARE_BASE/{pinpoint-collector-grpc.properties,pinpoint-collector-root.properties,hbase.properties} $COLLECTOR
+    \cp -f $SOFTWARE_BASE/{pinpoint-web-root.properties,hbase.properties} $WEB
+    chown -R $PINPOINT_USER. $BASE  && ok_p || error_p 
 
     
 }
@@ -232,7 +230,8 @@ User=pinpoint
 Group=pinpoint
 WorkingDirectory=$COLLECTOR
 Environment="JAVA_HOME=$JAVA_11_HOME"
-ExecStart=$JAVA_11_HOME/bin/java  -jar -Dpinpoint.zookeeper.address=localhost  $COLLECTOR/pinpoint-collector-boot-2.4.2.jar 
+ExecStart=$JAVA_11_HOME/bin/java  -jar -Dpinpoint.zookeeper.address=localhost  $COLLECTOR/pinpoint-collector-boot-2.4.2.jar \
+  --spring.config.additional-location=$COLLECTOR/pinpoint-collector-grpc.properties,$COLLECTOR/pinpoint-collector-root.properties,$COLLECTOR/hbase.properties
 ExecStop=/usr/bin/kill -15 \$MAINPID
 RestartSec=10
 KillSignal=SIGINT
@@ -252,7 +251,7 @@ User=pinpoint
 Group=pinpoint
 WorkingDirectory=$WEB
 Environment="JAVA_HOME=$JAVA_11_HOME"
-ExecStart=$JAVA_11_HOME/bin/java  -jar -Dpinpoint.zookeeper.address=localhost  $WEB/pinpoint-web-boot-2.4.2.jar  --spring.config.additional-location=$WEB/jdbc-root.properties
+ExecStart=$JAVA_11_HOME/bin/java  -jar -Dpinpoint.zookeeper.address=localhost  $WEB/pinpoint-web-boot-2.4.2.jar  --spring.config.additional-location=$WEB/jdbc-root.properties,$WEB/pinpoint-web-root.properties,$WEB/hbase.properties
 ExecStop=/usr/bin/kill -15 \$MAINPID
 RestartSec=10
 KillSignal=SIGINT
@@ -294,8 +293,8 @@ pinpoint_mysql(){
 
 
 pinpoint_start(){
-  ps axo pid,user,cmd | grep pinpoin[t] &>/dev/null
-  if [ $? -ne 0  ];then
+  
+  if [ ! -d $BASE  ];then
     java_b && \
     pinpoint_mysql && \
     pinpoint_env && \
@@ -321,12 +320,20 @@ print(){
   foo "hbase conf :$HBASE_SOFTWARE"
   foo "pinpoint   :$BASE"
   foo "pass       :$PASS"
-  foo "data ttl   :$TTL"
-  foo "start|stop :system"
+  foo "数据存或周期:${TTL}s"
+  foo "start|stop :systemctl <start|stop> <hbase|pinpoint_web|pinpoint_batch|pinpoint_collector>"
 }
 
+#if [ `basename $SOFTWARE_BASE` != 'pinpoint'  ];then 
+#   cd pinpoint || error_p 
+#   SOFTWARE_BASE=$(pwd)
+#   pwd
+#fi
 
-bash mysql.sh 
+
+[ -f pinpoint.tar.gz ] && tar xf pinpoint.tar.gz || error_p
+tar xf mysql_auto_install.tar.gz  && \
+bash mysql.sh
 [ $? -eq 87 -o $? -eq 0 ] && \
 java_a  && \
 pass  && \
