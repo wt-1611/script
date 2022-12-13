@@ -1,6 +1,6 @@
 # some script
 
-## 自动化安装
+## Automatic installation
 Clone the project and select neutral to do the following to install the components you need, currently all single point!
 
 ### mysql
