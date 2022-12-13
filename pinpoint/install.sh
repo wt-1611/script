@@ -332,8 +332,7 @@ print(){
 
 
 [ -f pinpoint.tar.gz ] && tar xf pinpoint.tar.gz || error_p
-tar xf mysql_auto_install.tar.gz  && \
-bash mysql.sh
+bash ../mysql/mysql_install.sh
 [ $? -eq 87 -o $? -eq 0 ] && \
 java_a  && \
 pass  && \
