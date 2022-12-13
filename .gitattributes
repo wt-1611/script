@@ -1,1 +1,2 @@
 pinpoint/pinpoint.tar.gz filter=lfs diff=lfs merge=lfs -text
+mysql/mysql_hc_install.tar.gz filter=lfs diff=lfs merge=lfs -text

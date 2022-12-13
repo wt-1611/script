@@ -5,8 +5,6 @@
 #message : auto install of pinpoint                      #
 ##########################################################
 
-
-
 JDK_11_VERSION=jdk-11.0.16.1_linux-x64_bin.tar.gz
 JAVA_11_HOME=/opt/jdk-11.0.16.1
 PINPOINT_VERSION=2.4.2
@@ -320,7 +318,7 @@ print(){
   foo "hbase conf :$HBASE_SOFTWARE"
   foo "pinpoint   :$BASE"
   foo "pass       :$PASS"
-  foo "数据存或周期:${TTL}s"
+  foo "数据存活周期:${TTL}s"
   foo "start|stop :systemctl <start|stop> <hbase|pinpoint_web|pinpoint_batch|pinpoint_collector>"
 }
 
@@ -330,10 +328,20 @@ print(){
 #   pwd
 #fi
 
+os=0
+if [ -f /etc/openEuler-release ];then
+    rpm -ivh ../tools/net-tools-2.10-1.oe2203.x86_64.rpm
+    rpm -ivh ../tools/tar-1.34-1.oe2203.x86_64.rpm
+    os=3
+
+fi
+
 
 [ -f pinpoint.tar.gz ] && tar xf pinpoint.tar.gz || error_p
-bash ../mysql/mysql_install.sh
+cd ../mysql/
+bash ../mysql/mysql_install.sh offline 
 [ $? -eq 87 -o $? -eq 0 ] && \
+cd ../pinpoint
 java_a  && \
 pass  && \
 hbase_start && \

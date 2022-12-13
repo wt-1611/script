@@ -1,3 +1,4 @@
+#!/bin/bash
 DATA=/var/lib/mysql
 LOG=/var/log/mysql
 PASS=/root/.pass
@@ -108,6 +109,7 @@ eof
             install -5.7* 5.7
         else
             echo "please downaload mysql_hc_install.tar.gz!!!"
+            exit 3
         fi
     fi
 }
@@ -270,6 +272,14 @@ exit 2
 }
 
 is_version(){
+     rpm -q  mysql-community-server > /dev/null
+     if [ $? -eq 0 ];then
+        echo "mysql already exists"
+        exit 3
+     fi 
+
+
+
     echo $1 | egrep '^5\.7|^8\.0' &>/dev/null
     [ $? -eq 0  ] || menu
 
@@ -281,7 +291,8 @@ is_version(){
 
 os=0
 if [ -f /etc/openEuler-release ];then
-    rpm -ivh ./net-tools-2.10-1.oe2203.x86_64.rpm
+    rpm -ivh ../tools/net-tools-2.10-1.oe2203.x86_64.rpm
+    rpm -ivh ../tools/tar-1.34-1.oe2203.x86_64.rpm
     os=3
 
 fi
