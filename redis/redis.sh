@@ -17,9 +17,9 @@ error_p(){
 
 is_package(){
     if [ "$SOURCE" = "" ];then
-        num=$(ls -1 $CURRENT  | egrep '^redis-(.*)\.tar\.gz' |wc -l)
+        num1=$(ls -1 $CURRENT  | egrep '^redis-(.*)\.tar\.gz' |wc -l)
         package=$(ls -1 $CURRENT  | egrep '^redis-(.*)\.tar\.gz' | sed -n 1p)
-        if [ $num -gt 1 ];then
+        if [ $num1 -gt 1 ];then
             ls -1 $CURRENT  | egrep '^redis-(.*)\.tar\.gz'
             read  -t 3 -p "Please enter the version you want to install:(default $package) " V
             if [ "$V" = "" ];then
@@ -33,7 +33,7 @@ is_package(){
                 tar xf $V && ok_p || error_p
                 REDIS_VERSION=$name
             fi
-        elif [ $num -eq 1 ];then
+        elif [ $num1 -eq 1 ];then
                 echo "Start to install the $REDIS_VERSION version"
 
                 tar xf $package && ok_p || error_p
@@ -72,6 +72,7 @@ CONF=$SOFTWARE/redis${PORT}.conf
 
 
 REDIS_USER_PASS=$(openssl rand -hex 16)
+echo $REDIS_USER_PASS
 
 INSTALL_LOG=/var/log/install.log
 
@@ -121,6 +122,7 @@ redis_create(){
     if [ ! -d $SOFTWARE/bin ] ;then
     title "Build redis 1"
         yum clean all &>/dev/null
+        echo "Verifying the yun source....."
         yum list --showduplicates  make &>/dev/null
         if [ $? -eq 0 ];then
             #repo
@@ -150,6 +152,7 @@ redis_create(){
         title  "Create a redis user"
         useradd redis 
         echo "$REDIS_USER_PASS" | passwd --stdin redis 
+        echo $REDIS_USER_PASS
     fi
 
     mkdir $DATA -p
@@ -171,6 +174,7 @@ fi
 }
 
 conf(){
+    echo $REDIS_USER_PASS
     title "Example Create the redis$1 configuration file"
 cat > $CONF <<eof
 bind 0.0.0.0
@@ -341,11 +345,10 @@ is_dir(){
 }
 
 
-    if  [ -f /etc/openEuler-release ];then
-        rpm -ivh ../tools/tar-1.34-1.oe2203.x86_64.rpm
-    fi
-
-
+if  [ -f /etc/openEuler-release ];then
+    rpm -q tar &>/dev/null
+   [ $? -eq 0 ] || rpm -ivh ../tools/tar-1.34-1.oe2203.x86_64.rpm
+fi
 
 case $1 in 
     single)
@@ -401,6 +404,7 @@ case $1 in
          shift
             num=$@
             #echo $num
+            #echo $num
             if [ "$num" = "" ];then
                     menu
             fi
@@ -422,7 +426,7 @@ case $1 in
                     menu
                 fi
             done
-            
+            #echo $num
             mkdir -p $SOFTWARE/cluster.d
             #chown -R redis. $SOFTWARE
             for s in "$@";do
@@ -433,9 +437,11 @@ case $1 in
                 is_dir $DATA $CONF
                 redis_cluster $pass
             done
-
+            echo $num
             title "Create a redis cluster"
-            echo yes|$SOFTWARE/bin/redis-cli --cluster create  $(echo $num | sed -r 's/([0-9]+)/127.0.0.1:\1/g') --cluster-replicas 1  -a $pass && \
+            #echo $num
+            echo "$SOFTWARE/bin/redis-cli --cluster create  $(echo $@ | sed -r 's/([0-9]+)/127.0.0.1:\1/g') --cluster-replicas 1  -a $pass"
+            echo yes|$SOFTWARE/bin/redis-cli --cluster create  $(echo $@ | sed -r 's/([0-9]+)/127.0.0.1:\1/g') --cluster-replicas 1  -a $pass && \
             ok_p || error_p
 
     ;;
