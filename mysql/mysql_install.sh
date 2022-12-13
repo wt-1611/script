@@ -42,9 +42,12 @@ process(){
 install(){
 
     title "install mysql$1"
-    v=$(echo $2 | sed 's/\.//g')
-    
-    nohup yum install  --enablerepo=mysql$v-community  mysql-community-server -y >>$INSTALL_LOG 2>&1 &
+    if [ $os -eq 3 -a  $n -eq 8 ];then 
+        nohup yum install mysql-server -y >>$INSTALL_LOG 2>&1 &
+    else
+        nohup yum install   mysql-community-server -y >>$INSTALL_LOG 2>&1 &
+      
+    fi 
     process $!
     wait $!
     [ $? -eq 0 ] && ok_p || error_p
@@ -55,12 +58,29 @@ repo_m(){
     #2是离线，1是在线
     flag=$2
     version=$1
-    
+    os=$3
     #echo $flag
     if [ $flag -eq 1 ];then
         mkdir -p  /etc/yum.repos.d/bak ; mv /etc/yum.repos.d/*.repo  /etc/yum.repos.d/bak &>/dev/null
-        rpm -ivh mysql80-community-release-el7-7.noarch.rpm &>/dev/null
-        sed -i '/MySQL 5.7 Community Server/{n;n;s/enabled=.*/enabled=1/;}' /etc/yum.repos.d/mysql-community.repo
+
+        n=$(echo $version | awk -F'.' '{print $1}')
+        if [ $os -eq 3 -a  $n -eq 8 ];then 
+            rpm -ivh mysql80-community-release-el8-4.noarch.rpm &>/dev/null
+            cp openEuler.repo /etc/yum.repos.d/
+
+        elif [ $os -eq 3 -a $n -eq 5 ];then
+            rpm -ivh mysql80-community-release-el7-7.noarch.rpm &>/dev/null
+            cp openEuler.repo /etc/yum.repos.d/
+            sed -i '/MySQL 5.7 Community Server/{n;n;s/enabled=.*/enabled=1/;}' /etc/yum.repos.d/mysql-community.repo
+            sed -i '/MySQL 8.0 Community Server/{n;n;s/enabled=.*/enabled=0/;}' /etc/yum.repos.d/mysql-community.repo
+
+        elif [ $os -eq 0 -a $n -eq 5 ];then
+            rpm -ivh mysql80-community-release-el7-7.noarch.rpm &>/dev/null
+            sed -i '/MySQL 5.7 Community Server/{n;n;s/enabled=.*/enabled=1/;}' /etc/yum.repos.d/mysql-community.repo
+            sed -i '/MySQL 8.0 Community Server/{n;n;s/enabled=.*/enabled=0/;}' /etc/yum.repos.d/mysql-community.repo
+        fi
+
+
         yum clean all &>/dev/null
         #nohup $SHELL  <<eof &
 #yum list --showduplicates  mysql-community-server | awk '{print $2}' | egrep '^'''$version'''' 
@@ -76,7 +96,7 @@ repo_m(){
 
     elif [ $flag -eq 2 ];then
         if [ -f mysql_hc_install.tar.gz ];then
-            tar xf mysql_hc_install.tar.gz && \
+            tar xvf mysql_hc_install.tar.gz &>>$INSTALL_LOG && ok_p || error_p
             mkdir -p  /etc/yum.repos.d/bak ; mv /etc/yum.repos.d/*.repo  /etc/yum.repos.d/bak 
             cat >/etc/yum.repos.d/mysql_hc.repo<<eof
 [mysql57-community]
@@ -85,7 +105,7 @@ enable=1
 baseurl=file://$LOCATION/hc/rpm
 gpgcheck=0
 eof
-            install -5.7* 5.7 && ok_p || error_p
+            install -5.7* 5.7
         else
             echo "please downaload mysql_hc_install.tar.gz!!!"
         fi
@@ -197,7 +217,7 @@ eof
 mysql_start(){
     title "Initialize && Start mysql"
     systemctl enable --now mysqld &>/dev/null
-
+    systemctl start mysqld
     status=`systemctl is-active  mysqld`
     if [ $status != "active" ];then
             sleep 2
@@ -255,15 +275,25 @@ is_version(){
 
     version=$(echo $1 | awk -F'.'  '{print $1"."$2}') 
     
-    repo_m $version $2
+    repo_m $version $2 $3
 
 }
+
+os=0
+if [ -f /etc/openEuler-release ];then
+    rpm -ivh ./net-tools-2.10-1.oe2203.x86_64.rpm
+    os=3
+
+fi
+
+
+
 
 case $1 in
     online)
         shift 
         [ "`systemctl is-active mysqld`" == "active" ] && foo "mysql is running" && exit 87  
-        is_version $1 1
+        is_version $1 1 $os
         m_main && exit 0
     ;;
     offline)
