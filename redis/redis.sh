@@ -2,34 +2,7 @@
 
 
 REDIS_VERSION=redis-6.2.7
-
-
-is_package(){
-    package=$(ls -1 $CURRENT  | egrep 'redis-(.*)\.tar\.gz' | sed -n 1p)
-    if [ "$package" = "" ] ;then
-        echo "The $REDIS_VERSION version will be installed by default"
-        
-    else
-        name=$(tar tvf $package| head -n1 | awk '{print $NF}'|sed 's#/##g')
-        REDIS_VERSION=$name
-        echo "Start to install the $REDIS_VERSION version"
-        tar xf $package
-    fi
-}
-
-is_package
-
-SOURCE=/root/$REDIS_VERSION
-SOFTWARE=/opt/redis6
-PORT=6379
-DATA_BASE=/data/redis6
-DATA=$DATA_BASE/$PORT
-CONF=$SOFTWARE/redis${PORT}.conf
 CURRENT=`pwd`
-
-REDIS_USER_PASS=$(openssl rand -hex 16)
-
-INSTALL_LOG=/var/log/install.log
 
 
 ok_p(){
@@ -40,6 +13,70 @@ error_p(){
     echo -e "\033[1;41;37m error \033[0m"
     exit 3
 }
+
+
+is_package(){
+    if [ "$SOURCE" = "" ];then
+        num=$(ls -1 $CURRENT  | egrep '^redis-(.*)\.tar\.gz' |wc -l)
+        package=$(ls -1 $CURRENT  | egrep '^redis-(.*)\.tar\.gz' | sed -n 1p)
+        if [ $num -gt 1 ];then
+            ls -1 $CURRENT  | egrep '^redis-(.*)\.tar\.gz'
+            read  -t 3 -p "Please enter the version you want to install:(default $package) " V
+            if [ "$V" = "" ];then
+                echo "Start to install the $package version"
+                name=$(tar tvf $package| head -n1 | awk '{print $NF}'|sed 's#/##g') 
+                tar xf $package && ok_p || error_p
+                REDIS_VERSION=$name
+            else
+                echo "Start to install the $V version"
+                name=$(tar tvf $V| head -n1 | awk '{print $NF}'|sed 's#/##g')
+                tar xf $V && ok_p || error_p
+                REDIS_VERSION=$name
+            fi
+        elif [ $num -eq 1 ];then
+                echo "Start to install the $REDIS_VERSION version"
+
+                tar xf $package && ok_p || error_p
+        else
+            echo "Please download the source package to the current directory!!!"
+            exit 3
+        fi
+
+        SOURCE=`pwd`/$REDIS_VERSION
+    fi
+    #echo $REDIS_VERSION
+
+    #package=$(ls -1 $CURRENT  | egrep '^redis-(.*)\.tar\.gz' | sed -n 1p)
+#    if [ "$package" = "" ] ;then
+#        echo "The $REDIS_VERSION version will be installed by default"
+#        if [ ! -d $REDIS_VERSION ];then
+#            echo "Unzip the redis source code and place it in the same directory as the script"
+#            exit 3
+#        fi
+#    else
+#        name=$(tar tvf $package| head -n1 | awk '{print $NF}'|sed 's#/##g')
+#        REDIS_VERSION=$name
+#        echo "Start to install the $REDIS_VERSION version"
+#        tar xf $package
+#    fi
+}
+
+
+
+#SOURCE=`pwd`/$REDIS_VERSION
+SOFTWARE=/opt/redis6
+PORT=6379
+DATA_BASE=/data/redis6
+DATA=$DATA_BASE/$PORT
+CONF=$SOFTWARE/redis${PORT}.conf
+
+
+REDIS_USER_PASS=$(openssl rand -hex 16)
+
+INSTALL_LOG=/var/log/install.log
+
+
+
 
 title(){
     #echo -en "\033[1;33m================== $1 ======================\033[0m\n"
@@ -83,7 +120,8 @@ eof
 redis_create(){
     if [ ! -d $SOFTWARE/bin ] ;then
     title "Build redis 1"
-        ping -c1 www.baidu.com &>/dev/null
+        yum clean all &>/dev/null
+        yum list --showduplicates  make &>/dev/null
         if [ $? -eq 0 ];then
             #repo
             nohup yum install  make systemd-devel gcc -y &> $INSTALL_LOG &
@@ -105,6 +143,7 @@ redis_create(){
         process $!
         wait $!
         [ $? -eq 0 ] && ok_p || error_p
+        cd ..
     fi
     id redis &>/dev/null
     if [ $? -ne 0 ];then
@@ -149,7 +188,6 @@ syslog-enabled no
 #databases 16
 #是否显示logo
 always-show-logo yes
-
 ###########################################
 save 900 1
 save 300 10
@@ -160,8 +198,7 @@ rdbchecksum yes
 dbfilename dump_$PORT.rdb
 rdb-del-sync-files no
 dir $DATA
-
-requirepass $(openssl rand -hex 17)
+requirepass $REDIS_USER_PASS
 replica-serve-stale-data yes
 replica-read-only yes
 repl-diskless-sync no
@@ -224,8 +261,6 @@ cat > /usr/lib/systemd/system/redis_${PORT}.service <<eof
 Description=Redis persistent key-value database
 After=network.target
 After=network-online.target
-
-
 [Service]
 Type=simple
 PIDFile=$DATA/redis_$PORT.pid
@@ -233,8 +268,6 @@ ExecStart=$SOFTWARE/bin/redis-server $CONF
 ExecStop=$(which kill) -15 \$MAINPID
 User=redis
 Group=redis
-
-
 [Install]
 WantedBy=multi-user.target
 eof
@@ -302,9 +335,15 @@ is_dir(){
         echo 'The configuration file or data directory of redis'''$PORT''' already exists!!!'
         exit 1
     fi
+    is_package
+    
+
 }
 
 
+    if  [ -f /etc/openEuler-release ];then
+        rpm -ivh ../tools/tar-1.34-1.oe2203.x86_64.rpm
+    fi
 
 
 
@@ -417,4 +456,3 @@ foo "conf       :   $SOFTWARE"
 foo "data       :   $DATA_BASE"
 foo "user pass  :   $REDIS_USER_PASS"
 foo "service    :   systemctl [start|stop] redis_<port>"
-
