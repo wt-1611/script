@@ -1,4 +1,5 @@
 # some script
+Compatible with Euler and centos
 
 ## Automatic installation
 Clone the project and select neutral to do the following to install the components you need, currently all single point!
