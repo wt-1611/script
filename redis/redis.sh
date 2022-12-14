@@ -406,6 +406,7 @@ case $1 in
 
     cluster)
          pass=`openssl rand -hex 16`
+         REDIS_USER_PASS=$pass
          shift
             num=$@
             #echo $num
