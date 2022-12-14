@@ -193,6 +193,7 @@ logfile $DATA/redis_$PORT.log
 syslog-enabled no
 databases 16
 maxmemory $(free -b | awk '/Mem/{print ($2*0.75)}')
+maxmemory-policy volatile-lru
 #是否显示logo
 always-show-logo yes
 ###########################################
