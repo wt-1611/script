@@ -262,6 +262,8 @@ eof
 
 redis_start(){
     title "Create the redis$1 startup file && Starting redis$1"
+    echo "PASS_$PORT=$REDIS_USER_PASS" >> /run/Pasredis
+    chmod 000 /run/Pasredis
 cat > /usr/lib/systemd/system/redis_${PORT}.service <<eof
 [Unit]
 Description=Redis persistent key-value database
@@ -270,8 +272,9 @@ After=network-online.target
 [Service]
 Type=simple
 PIDFile=$DATA/redis_$PORT.pid
+EnvironmentFile=/run/Pasredis
 ExecStart=$SOFTWARE/bin/redis-server $CONF
-ExecStop=$SOFTWARE/bin/redis-cli -p $PORT -a "$REDIS_USER_PASS" shutdown
+ExecStop=$SOFTWARE/bin/redis-cli -p $PORT -a \${PASS_$PORT} shutdown
 #ExecStop=$(which kill) -15 \$MAINPID
 User=redis
 Group=redis
