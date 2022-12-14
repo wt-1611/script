@@ -168,6 +168,8 @@ cat >> /etc/sysctl.d/redis.conf <<eof
 vm.overcommit_memory=1
 net.core.somaxconn=1024
 eof
+echo "redis hard nofile 65536" >/etc/security/limits.d/redis.conf
+echo "redis soft nofile 65536" >>/etc/security/limits.d/redis.conf
 sysctl -p /etc/sysctl.d/redis.conf && ok_p || error_p
 fi
 
