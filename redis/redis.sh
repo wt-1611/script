@@ -270,8 +270,9 @@ After=network-online.target
 [Service]
 Type=simple
 PIDFile=$DATA/redis_$PORT.pid
-ExecStart=$SOFTWARE/bin/redis-server $CONF 
-ExecStop=$(which kill) -15 \$MAINPID
+ExecStart=$SOFTWARE/bin/redis-server $CONF
+ExecStop=$SOFTWARE/bin/redis-cli -p $PORT -a "$REDIS_USER_PASS" shutdown
+#ExecStop=$(which kill) -15 \$MAINPID
 User=redis
 Group=redis
 [Install]
