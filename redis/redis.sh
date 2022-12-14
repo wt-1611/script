@@ -365,7 +365,9 @@ case $1 in
             is_port $p
             
             PORT=$p
-            is_package
+            DATA=$DATA_BASE/$PORT
+            CONF=$SOFTWARE/redis${PORT}.conf
+            is_dir $DATA $CONF
 
             redis
 
