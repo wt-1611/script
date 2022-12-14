@@ -223,7 +223,7 @@ replica-lazy-flush no
 lazyfree-lazy-user-del no
 oom-score-adj no
 oom-score-adj-values 0 200 800
-appendonly no
+appendonly yes
 appendfilename "${PORT}_appendonly.aof"
 appendfsync everysec
 no-appendfsync-on-rewrite no
