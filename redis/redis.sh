@@ -192,7 +192,7 @@ loglevel notice
 logfile $DATA/redis_$PORT.log
 syslog-enabled no
 databases 16
-maxmemory $(grep -w MemTotal  /proc/meminfo | awk '{print ($2*8*0.75)}')
+maxmemory $(free -b | awk '/Mem/{print ($2*0.75)}')
 #是否显示logo
 always-show-logo yes
 ###########################################
