@@ -365,6 +365,7 @@ case $1 in
             is_port $p
             
             PORT=$p
+            is_package
 
             redis
 
