@@ -168,7 +168,7 @@ cat >> /etc/sysctl.d/redis.conf <<eof
 vm.overcommit_memory=1
 net.core.somaxconn=1024
 eof
-sysctl -p && ok_p || error_p
+sysctl -p /etc/sysctl.d/redis.conf && ok_p || error_p
 fi
 
 }
