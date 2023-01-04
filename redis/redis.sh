@@ -37,6 +37,8 @@ is_package(){
                 echo "Start to install the $REDIS_VERSION version"
 
                 tar xf $package && ok_p || error_p
+                name=$(tar tvf $package| head -n1 | awk '{print $NF}'|sed 's#/##g') 
+                REDIS_VERSION=$name
         else
             echo "Please download the source package to the current directory!!!"
             exit 3
