@@ -188,18 +188,12 @@ tcp-backlog 511
 timeout 0
 tcp-keepalive 300
 daemonize no
-supervised no
+supervised systemd
 pidfile $DATA/redis_$PORT.pid
 loglevel notice
 logfile $DATA/redis_$PORT.log
 syslog-enabled no
 databases 16
-maxmemory $(free -b | awk '/Mem/{print ($2*0.75)}')
-maxmemory-policy volatile-lru
-replica-ignore-maxmemory no
-#是否显示logo
-always-show-logo yes
-###########################################
 save 900 1
 save 300 10
 save 60 10000
@@ -271,18 +265,22 @@ redis_start(){
     chmod 000 /run/Pasredis
 cat > /usr/lib/systemd/system/redis_${PORT}.service <<eof
 [Unit]
-Description=Redis persistent key-value database
-After=network.target
+Description=Redis data structure server
+Documentation=https://redis.io/documentation
+Wants=network-online.target
 After=network-online.target
+
 [Service]
-Type=simple
 PIDFile=$DATA/redis_$PORT.pid
 EnvironmentFile=/run/Pasredis
 ExecStart=$SOFTWARE/bin/redis-server $CONF
 ExecStop=$SOFTWARE/bin/redis-cli -p $PORT -a \${PASS_$PORT} --no-auth-warning shutdown
-#ExecStop=$(which kill) -15 \$MAINPID
+Type=notify
 User=redis
 Group=redis
+RuntimeDirectory=redis
+RuntimeDirectoryMode=0755
+
 [Install]
 WantedBy=multi-user.target
 eof
