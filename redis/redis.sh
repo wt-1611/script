@@ -74,7 +74,7 @@ CONF=$SOFTWARE/redis${PORT}.conf
 
 
 REDIS_USER_PASS=$(openssl rand -hex 16)
-echo $REDIS_USER_PASS
+#echo $REDIS_USER_PASS
 
 INSTALL_LOG=/var/log/install.log
 
@@ -154,7 +154,7 @@ redis_create(){
         title  "Create a redis user"
         useradd redis 
         echo "$REDIS_USER_PASS" | passwd --stdin redis 
-        echo $REDIS_USER_PASS
+        #echo $REDIS_USER_PASS
     fi
 
     mkdir $DATA -p
@@ -178,7 +178,7 @@ fi
 }
 
 conf(){
-    echo $REDIS_USER_PASS
+    #echo $REDIS_USER_PASS
     title "Example Create the redis$1 configuration file"
 cat > $CONF <<eof
 bind 0.0.0.0
@@ -188,6 +188,7 @@ tcp-backlog 511
 timeout 0
 tcp-keepalive 300
 daemonize no
+always-show-logo yes
 supervised systemd
 pidfile $DATA/redis_$PORT.pid
 loglevel notice
@@ -376,8 +377,9 @@ case $1 in
             PORT=$p
             DATA=$DATA_BASE/$PORT
             CONF=$SOFTWARE/redis${PORT}.conf
+			SOURCE=`pwd`/$REDIS_VERSION
             is_dir $DATA $CONF
-
+			tar xf $REDIS_VERSION.tar.gz || error_p
             redis
 
     ;;
@@ -473,5 +475,5 @@ foo "port       :   $num"
 foo "software   :   $SOFTWARE"
 foo "conf       :   $SOFTWARE"
 foo "data       :   $DATA_BASE"
-foo "user pass  :   $REDIS_USER_PASS"
+foo "reids user pass  :   $REDIS_USER_PASS"
 foo "service    :   systemctl [start|stop] redis_<port>"
