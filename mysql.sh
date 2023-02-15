@@ -269,7 +269,9 @@ function online(){
             prompt "${OS}-${VERSION}不支持mysql5.7在线安装。"
             exit 2
         else
-            foo "yum install --enablerepo=mysql57-community  mysql-community-server-5.7.23 -y"
+            sed -ir '/mysql57-community/,/^$/s/enabled=0/enabled=1/' /etc/yum.repos.d/mysql-community.repo
+            sed -ir '/mysql80-community/,/^$/s/enabled=1/enabled=0/' /etc/yum.repos.d/mysql-community.repo
+            foo "yum install   mysql-community-server-5.7.23 -y"
                     [ $? -eq 0 ] || error_p && ok_p
         fi
     elif [ "$1" = "8.0" ];then
@@ -343,3 +345,4 @@ case $1 in
     ;;
 
 esac
+
