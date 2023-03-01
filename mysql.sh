@@ -13,7 +13,7 @@ REPO_NAME=/etc/yum.repos.d/mysql.repo
 
 useradd mysql &>/dev/null
 
-
+flag=false
 
 function ok_p(){
     echo -e "\033[1;42;37m ok \033[0m"
@@ -197,7 +197,7 @@ function user(){
 
 function offline(){
     title "Environmental preparation"
-    if ! flag;then
+    if $flag;then
         prompt "未发现离线安装包"
         exit 2
     fi
