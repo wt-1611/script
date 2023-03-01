@@ -69,7 +69,7 @@ os::Security () {
     egrep -q "^Banner" /etc/ssh/sshd_config && sed -ri "s/^Banner.*/Banner \/etc\/issue/" /etc/ssh/sshd_config || echo "Banner /etc/issue" >> /etc/ssh/sshd_config
     
     #关闭反向解析
-    egrep -q "^UseDNS" /etc/ssh/sshd_config && sed -ri 's/^UseDNS/UseDNS no/g' /etc/ssh/sshd_config || echo "UseDNS no" >>/etc/ssh/sshd_config 
+    egrep -q "^UseDNS" /etc/ssh/sshd_config && sed -ri 's/^UseDNS.*/UseDNS no/g' /etc/ssh/sshd_config || echo "UseDNS no" >>/etc/ssh/sshd_config 
 
     #开启公钥
     egrep -q "^PubkeyAuthentication" /etc/ssh/sshd_config && sed -ri 's/^PubkeyAuthentication.*/PubkeyAuthentication yes/g' /etc/ssh/sshd_config || echo "PubkeyAuthentication yes" >>/etc/ssh/sshd_config
