@@ -10,80 +10,108 @@ PASS=/root/.pass
 USER="root pinpoint sqladm sqlapp"
 SQL_FILE=/root/sql.txt
 REPO_NAME=/etc/yum.repos.d/mysql.repo
+INSTALL_LOG=/var/log/install.log
 
 useradd mysql &>/dev/null
 
 flag=false
 
-function ok_p(){
-    echo -e "\033[1;42;37m ok \033[0m"
+
+## 名称: err 、info 、warning
+## 用途：全局Log信息打印函数
+## 参数: $@
+log::err() {
+  printf "[$(date +'%Y-%m-%dT%H:%M:%S')]: \033[31mERROR: $@ \033[0m\n"
+}
+log::warning() {
+  printf "[$(date +'%Y-%m-%dT%H:%M:%S')]: \033[33mWARNING: $@ \033[0m\n"
+}
+log:info-1(){
+  printf "[$(date +'%Y-%m-%dT%H:%M:%S')]: \033[32mINFO: $@ \033[0m\n"
+}
+log::info(){
+    i=0
+    local shu=1
+    while [ $shu -gt 0 ];do
+            local shu=$(ps axo pid | grep -w $background|wc -l)
+            if [ $i -eq 0  ];then
+                    printf "[$(date +'%Y-%m-%dT%H:%M:%S')]: \033[32mINFO: %s \033[0m" "$*"
+                    local num=$(echo "[$(date +'%Y-%m-%dT%H:%M:%S')]: \033[32mINFO: $* \033[0m" | wc -L)
+            fi
+
+            printf "."
+            sleep 0.2
+
+            i=$(($i+1))
+            if [ $i -gt 10  ];then
+                printf "\r%$((11+$num))s" " "
+                i=0
+                printf "\r"
+            fi
+    done
+    echo 
 }
 
-function error_p(){
-    echo -e "\033[1;41;37m error \033[0m"
-    exit 2
+#实用的处理函数
+function Deal(){
+        echo "[$(date '+%F_%T') $1]" >>$INSTALL_LOG
+        $1 &>>$INSTALL_LOG &
+        background=$!
+}
+#结束函数
+function End(){
+        wait $background
+        if [ $? -ne 0 ];then 
+            log::err "$*"
+            exit 2
+        fi
 }
 
 
-function title(){
-    #echo -en "\033[1;33m================== $1 ======================\033[0m\n"
-    for i in {1..100};do printf "\033[1;31m%s\033[0m" "=";done;printf "\n"
-    printf "\033[1;33m %-20s \033[0m \n" "$1"
-    for i in {1..100};do printf "\033[1;31m%s\033[0m" "=";done;printf "\n"
-}
-
-
-function prompt(){
-    echo -en "\033[1;35m$1\033[0m\n"
-}
-
-function foo(){
-    echo -en "\033[1;36m$1\033[0m\n"    
-    $1 2>&1 >> /var/log/mysql_install.log
-}
 
 function check(){
-    title "MySQL Environment Check"
+    log:info-1 "MySQL Environment Check"
     #操作系统版本检查
     if [ -f /etc/redhat-release ];then
         OS=rhel
         VERSION=$(awk -F '.' '{print $1}' /etc/redhat-release  |  awk '{print $NF}')
-        if [ $VERSION -ne 7 -a $VERSION -ne 8 ];then
-            prompt "不支持的操作系统版本"
+        if [ $VERSION -ne 7 -a $VERSION -ne 8 -a $VERSION -ne 6  ];then
+            log::err "不支持的操作系统版本"
             exit 2
         fi
     elif [ -f /etc/openEuler-release ];then
         OS=euler
         VERSION=$(awk -F '.' '{print $1}' /etc/openEuler-release  | awk '{print $NF}')
-        foo "yum install tar net-tools -y"
+        Deal "yum install tar net-tools -y"
+        log::info "install net-tools"
+        End "安装失败"
         
     else
-        prompt "不支持的操作系统"
+        log:err "不支持的操作系统"
         exit 2
         
     fi
 
     #mysql安装包检查
     if [ ! -f $DIR/$TAR ];then
-        prompt "离线安装包不存在，请勿使用离线安装"
-        prompt "The offline installation package does not exist. Do not install it offline"
+        log::warning "离线安装包不存在，请勿使用离线安装"
+        log::warning "The offline installation package does not exist. Do not install it offline"
         flag=true #禁用离线安装
     fi
 
     #mysql环境检查
     ps aux | grep mysql[d] &>/dev/null
     if [ $? -eq 0  ];then
-        prompt "mysqld 已经存在"
-        prompt "mysql already exists"
+        log::err "mysqld 已经存在"
+        log::err "mysql already exists"
         exit 2
     else
         if [ -d $DATA -o -d $BASE ];then
-            prompt "$DATA or $BASE directory already exists"
-            prompt "$DATA or $BASE 目录已经存在。请删除"
+            log::err "$DATA or $BASE directory already exists"
+            log::err "$DATA or $BASE 目录已经存在。请删除"
             exit 2
         fi
     fi
-    ok_p
 }
 
 function conf(){
@@ -168,6 +196,7 @@ eof
 
 function user(){
     if [ ! -f  $PASS ];then
+        log:info-1 "create mysql database user"
         export MYSQL_PWD=$(grep password $LOG/mysqld.log | awk '{print $NF}'|head -n1)
         #echo "set global validate_password_policy = 0;"
         for i in $USER;do
@@ -188,113 +217,133 @@ function user(){
             fi
         done
         chmod 000 $PASS
-        #[ $? -eq 0  ] || error_p
+        
         mysql -uroot  < $SQL_FILE --connect-expired-password
-        [ $? -eq 0 ] && rm -fr $SQL_FILE|| error_p
+        if [ $? -eq 0 ];then
+             rm -fr $SQL_FILE 
+        else
+            info::err "Description Failed to create a mysql user"
+            exit 2
+        fi
     fi
 
 }
 
 function offline(){
-    title "Environmental preparation"
+    log:info-1 "Environmental preparation"
     if $flag;then
-        prompt "未发现离线安装包"
+        log::err "未发现离线安装包"
         exit 2
     fi
 
-    foo "tar xf $TAR -C /opt/"
-    if [ $? -eq 0 ];then
+    Deal "tar xvf $TAR -C /opt/"
+    log::info "unzip mysql software"
+    End "解压失败"
+    if [ $background -ne 0 ];then
+        log:info-1 "Create a mysql directory"
         ln -s /opt/$SOFT $BASE
         cd $BASE
         mkdir -p $LOG /var/run/mysqld
         chown -R mysql. $BASE /opt/$SOFT $LOG /var/run/mysqld
         ln -s $BASE/bin/mysql /usr/local/bin
         ln -s $BASE/bin/mysqld /usr/local/bin
-        ok_p
-    else 
-        error_p
     fi
-    title "mysql configuration"
+    log:info-1 "mysql configuration"
     conf
     sed -i '/\[mysqld\]/abasedir='''$BASE'''' /etc/my.cnf
-    ok_p
-    title "initialization"
-    foo "mysqld --initialize --user=mysql --datadir=$DATA --basedir=$BASE"
-    if [ $? -eq 0 ];then
-        \cp -f  support-files/mysql.server /etc/init.d/mysqld
-        ok_p
+
+    
+    Deal "mysqld --initialize --user=mysql --datadir=$DATA --basedir=$BASE"
+    log::info "initialization mysql data"
+    End "初始化失败"
+   
+    log:info-1 "Create a mysql startup file"
+    cd $BASE
+    \cp -f  support-files/mysql.server /etc/init.d/mysqld
+    chkconfig  --add mysqld &>>$INSTALL_LOG
+    
+
+    if [ $VERSION -eq 6 ];then     
+    #server mysqld start &>>$INSTALL_LOG
+        Deal  "service mysqld start"
     else
-        error_p
+        Deal "systemctl start mysqld"
     fi
-    title "starting"
-    chkconfig  --add mysqld
-    systemctl enable mysqld 
-    foo "systemctl start mysqld"
-    [ $? -eq 0 ] && ok_p || error_p
-    title "create mysql user"
-    foo "yum install libncurses* -y"
-    user
-    ok_p
+    log::info "starting mysqld"
+    End "启动失败"
+   
+   
+    Deal "yum install libncurses* -y"
+    log::info "install tools"
+    End "安装失败"
 }
 
 
 function online(){
-    title "yum repo install"
+    log:info-1 "Do not validate ssl"
     grep "sslverify=false" /etc/yum.conf || echo "sslverify=false" >>/etc/yum.conf
     rpm -qa |grep mysql.*-release.* &>/dev/null
     if [ $? -ne 0 ];then
         local status=$(curl -s -o /dev/null -s -w %{http_code} -m 5  --connect-timeout 10   http://repo.mysql.com/yum/)
         if [ $status -ne 200 ];then
-            prompt "http://repo.mysql.com/yum/不可达，请检查网络！！"
+            log:info-1 "http://repo.mysql.com/yum/不可达，请检查网络！！"
+            exit 2
         fi
-        
-        
-        if [ $VERSION -eq 22 -o $VERSION -eq 8 ];then
-            foo "rpm -ivh https://repo.mysql.com//mysql80-community-release-el8-4.noarch.rpm"
-            [ $? -eq 0 ] || error_p && ok_p
+        if [ $VERSION -eq 6 ];then
+            log::err "6版本不支持离线安装！"
+            exit 2
+        elif [ $VERSION -eq 22 -o $VERSION -eq 8 ];then
+            Deal "rpm -ivh https://repo.mysql.com//mysql80-community-release-el8-4.noarch.rpm"
+            log::info "install mysql yum repo"
+            End “安装失败”
 
         elif [ $VERSION -eq 7 ];then
-            foo "yum remove -y mariadb-libs"
-            foo "rpm -ivh https://repo.mysql.com//mysql80-community-release-el7-7.noarch.rpm"
-            [ $? -eq 0 ] || error_p && ok_p    
+            yum remove -y mariadb-libs &>>$INSTALL_LOG
+            Deal "rpm -ivh https://repo.mysql.com//mysql80-community-release-el7-7.noarch.rpm"   
+            log::info "install mysql yum repo"
+            End "安装失败"
         fi
     else
-        prompt "skip "
+        log::err "mysql already exists!"
+        exit 2
     fi
 
-    title "yum install mysql $1"
+    #log:info-1 "yum install mysql $1"
     
     if [ "$1" = "5.7"   ];then
         if [ $VERSION -eq 22 -o $VERSION -eq 8 ];then
-            prompt "${OS}-${VERSION}不支持mysql5.7在线安装。"
+            log:info-1 "${OS}-${VERSION}不支持mysql5.7在线安装。"
             exit 2
         else
             sed -ir '/mysql57-community/,/^$/s/enabled=0/enabled=1/' /etc/yum.repos.d/mysql-community.repo
             sed -ir '/mysql80-community/,/^$/s/enabled=1/enabled=0/' /etc/yum.repos.d/mysql-community.repo
-            foo "yum install   mysql-community-server-5.7.23 -y"
-                    [ $? -eq 0 ] || error_p && ok_p
+            Deal "yum install   mysql-community-server-5.7.23 -y"
+            log::info "install mysql 5.7.23"
+            End "安装失败"
+                   
         fi
     elif [ "$1" = "8.0" ];then
-       foo "yum install mysql-community-server-8.0.27 -y"
-            [ $? -eq 0 ] || error_p && ok_p
+        Deal "yum install mysql-community-server-8.0.27 -y"
+        log::info "install mysql 8.0.27"
+        End "安装失败"
 
     else
-        prompt "An unsupported version "
+        log::err "an unsupported version "
         exit 2
     fi
 
-    title "mysql configuration"
+    log:info-1 "mysql configuration"
     conf
-    ok_p
+    log:info-1 "Create a mysql directory"
     mkdir -p $LOG
     chown -R mysql.  $LOG
     title "starting"
     systemctl enable mysqld
-    foo "systemctl restart mysqld"
-    [ $? -eq 0 ] || error_p && ok_p
-    title "create mysql user"
-    user
-    ok_p
+    Deal "systemctl restart mysqld"
+    log::info "starting mysqld"
+    End "启动失败"
+    
+    
 }
 
 function menu(){
@@ -308,18 +357,16 @@ function menu(){
 EOF
 }
 
-environment(){
-    title "Environment"
-        cat <<eof
-    mysql user :          $USER
-    mysql data :          $DATA
-    mysql conf :          /etc/my.cnf
-    mysql log  :          $LOGFILE
-    mysql repo :          $REPO_NAME
-    mysql password file : $PASS
-    mysql status:         systemctl start|stop mysqld
+function environment(){
+    
 
-eof
+    log:info-1 "mysql user $USER"
+    log:info-1 "mysql data dir $DATA"
+    log:info-1 "mysql config /etc/my.cnf"
+    log:info-1 "mysql log file  $LOGFILE"
+    log:info-1 "mysql password file $PASS"
+    log:info-1 "mysql management mode [systemctl start|stop mysqld]"
+
 
 }
 
@@ -329,6 +376,7 @@ case $1 in
         
         check
         offline
+        user
         environment
     ;;
 
@@ -336,6 +384,7 @@ case $1 in
         shift 
         check
         online $1
+        user
         environment
     ;;
 
@@ -345,4 +394,3 @@ case $1 in
     ;;
 
 esac
-
