@@ -189,6 +189,28 @@ innodb_max_dirty_pages_pct = 50
 #transaction-isolation = READ-COMMITTED  
 innodb_buffer_pool_instances=4 
 #innodb_force_recovery = 1
+
+########safe#######
+plugin-load-add=connection_control.so
+plugin-load-add=validate_password.so
+validate_password_policy=MEDIUM
+validate_password_length=8
+validate_password_mixed_case_count=1
+validate_password_number_count=1
+validate_password_special_char_count=1
+#default_password_lifetime=90
+connection_control_failed_connections_threshold=5
+connection_control_min_connection_delay=60000
+interactive_timeout=300
+wait_timeout=300
+general_log=on
+#ssl-ca = /var/lib/mysql/ca.pem
+#ssl-cert = /var/lib/mysql/server-cert.pem
+#ssl-key = /var/lib/mysql/server-key.pem
+early-plugin-load=keyring_file.so  
+#ssl
+require_secure_transport=ON
+
 eof
 
 }
